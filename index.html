@@ -3,6 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ESTA LÍNEA ES CLAVE: Permite cargar las imágenes de Steam directamente sin error 403 Forbidden -->
+  <meta name="referrer" content="no-referrer">
   <title>Dota 2 Shop - Catálogo</title>
   <style>
     :root {
@@ -32,7 +34,7 @@
       padding-bottom: 100px;
     }
 
-   .banner-wrapper {
+    .banner-wrapper {
       width: 100%;
       background-color: #050608;
       border-bottom: 2px solid #2a201a;
@@ -44,8 +46,8 @@
 
     .banner-img {
       width: 100%;
-      max-width: 1280px; /* Se alinea con el ancho de tu catálogo */
-      height: auto;      /* Mantiene la proporción natural */
+      max-width: 1280px;
+      height: auto;
       display: block;
     }
 
@@ -257,13 +259,31 @@
     }
 
     .cart-item {
-      background: #1c202a;
-      padding: 10px 14px;
-      border-radius: 6px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+  background: #1c202a;
+  padding: 10px 14px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cart-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cart-item-name {
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.cart-item-price {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dota-gold);
+}
 
     .cart-footer {
       padding: 20px;
@@ -290,12 +310,72 @@
       color: var(--text-muted);
       font-size: 15px;
     }
+ @media (max-width: 600px) {
+  .container {
+    padding: 0 10px;
+  }
+
+  .filters {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .filters input,
+  .filters select {
+    width: 100%;
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .card-img-box {
+    height: 130px;
+    padding: 6px;
+  }
+
+  .card-body {
+    padding: 10px;
+    gap: 4px;
+  }
+
+  .hero-name {
+    font-size: 11px;
+  }
+
+  .item-name {
+    font-size: 14px;
+  }
+
+  .item-slot {
+    font-size: 11px;
+  }
+
+  .item-price {
+    font-size: 16px;
+    margin: 4px 0 8px 0;
+  }
+
+  .btn-add {
+    font-size: 12px;
+    padding: 8px 4px;
+  }
+
+  .cart-floating-btn {
+    bottom: 16px;
+    right: 16px;
+    padding: 12px 18px;
+  }
+}   
   </style>
 </head>
 <body>
 
 <header class="banner-wrapper">
-  <img class="banner-img" src="Portada.jpg" alt="Tienda Secreta de Sithil">
+  <img class="banner-img" src="portada.jpg" alt="Tienda Secreta de Sithil">
 </header>
 
 <div class="container">
@@ -376,6 +456,16 @@
     return rows;
   }
 
+  function formatSteamUrl(url) {
+    if (!url) return "";
+    let clean = url.trim();
+    // Si es un link de Steam y no tiene la resolución final (/360fx360f), se la agregamos
+    if (clean.includes("steamstatic.com") && !clean.endsWith("/360fx360f") && !clean.endsWith("/512fx512f")) {
+      clean = clean.replace(/\/+$/, '') + "/360fx360f";
+    }
+    return clean;
+  }
+
   async function loadCatalog() {
     const status = document.getElementById("statusMsg");
     try {
@@ -397,18 +487,23 @@
         let price      = r[4] || ""; // Columna E
         let img        = r[6] || ""; // Columna G
 
+        // Si hay héroe o nombre de ítem y tiene precio o imagen
         if (heroName || itemName) {
           if (price && !price.includes("S/.")) {
             price = `S/. ${price}`;
           }
+
+          // Si el nombre del ítem en columna A está vacío, usamos el slot o "Ítem de [Héroe]"
+          const displayName = itemName ? itemName : (slot ? `${slot}` : `Ítem de ${heroName}`);
+
           itemsData.push({
             id: i,
-            nombre: itemName || heroName,
+            nombre: displayName,
             heroe: heroName,
             rareza: rarity,
             espacio: slot,
             precio: price || "Consultar",
-            img: img.startsWith("http") ? img : ""
+            img: formatSteamUrl(img)
           });
         }
       }
@@ -475,7 +570,7 @@
       card.innerHTML = `
         <div class="card-img-box">
           ${item.rareza ? `<span class="card-badge">${item.rareza}</span>` : ''}
-          <img src="${item.img}" alt="${item.nombre}" onerror="this.onerror=null; this.src='https://placehold.co/240x160/14161d/e5a93c?text=${encodeURIComponent(item.heroe)}';">
+          <img src="${item.img}" alt="${item.nombre}" onerror="this.onerror=null; this.src='https://placehold.co/240x160/14161d/e5a93c?text=${encodeURIComponent(item.heroe || 'Dota 2')}';">
         </div>
         <div class="card-body">
           <div class="hero-name">${item.heroe}</div>
@@ -489,12 +584,11 @@
     });
   }
 
-  window.addToCart = function(id) {
+ window.addToCart = function(id) {
     const it = itemsData.find(x => x.id === id);
     if (!it) return;
     cart.push(it);
     updateCart();
-    openCart();
   };
 
   window.removeFromCart = function(idx) {
@@ -503,23 +597,26 @@
   };
 
   function updateCart() {
-    document.getElementById("cartCount").innerText = cart.length;
-    const list = document.getElementById("cartItemsList");
-    list.innerHTML = "";
+  document.getElementById("cartCount").innerText = cart.length;
+  const list = document.getElementById("cartItemsList");
+  list.innerHTML = "";
 
-    let total = 0;
-    cart.forEach((it, i) => {
-      const rawPrice = parseFloat(it.precio.replace(/S\/\.?/g, '').replace(/[^0-9.]/g, '')) || 0;
-      total += rawPrice;
-      list.innerHTML += `
-        <div class="cart-item">
-          <span>${it.heroe} - ${it.nombre}</span>
-          <button onclick="removeFromCart(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;">✕</button>
-        </div>`;
-    });
+  let total = 0;
+  cart.forEach((it, i) => {
+    const rawPrice = parseFloat(it.precio.replace(/S\/\.?/g, '').replace(/[^0-9.]/g, '')) || 0;
+    total += rawPrice;
+    list.innerHTML += `
+      <div class="cart-item">
+        <div class="cart-item-info">
+          <span class="cart-item-name">${it.heroe} - ${it.nombre}</span>
+          <span class="cart-item-price">${it.precio}</span>
+        </div>
+        <button onclick="removeFromCart(${i})" style="background:none;border:none;color:#ef4444;cursor:pointer;">✕</button>
+      </div>`;
+  });
 
-    document.getElementById("cartTotal").innerText = `S/. ${total.toFixed(2)}`;
-  }
+  document.getElementById("cartTotal").innerText = `S/. ${total.toFixed(2)}`;
+}
 
   function openCart() {
     document.getElementById("cartDrawer").classList.add("open");
@@ -544,5 +641,5 @@
 
   loadCatalog();
 </script>
-</body>
+</body> 
 </html>
